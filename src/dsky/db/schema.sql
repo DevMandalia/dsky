@@ -1,0 +1,1 @@
+-- dsky database schema: append-only event store and projection tables.
