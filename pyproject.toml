@@ -33,6 +33,10 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--tb=short",
+    "-m", "not requires_polygon",
+]
+markers = [
+    "requires_polygon: hits the live Polygon API; needs POLYGON_API_KEY and a network. Run explicitly via `pytest -m requires_polygon`.",
 ]
 
 # --- ruff (strict) --------------------------------------------------------------

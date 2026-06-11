@@ -5,6 +5,7 @@ API is exercised separately (one-off, manual, with a real API key).
 """
 import hashlib
 import json
+import os
 import sqlite3
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta, timezone
@@ -686,3 +687,93 @@ def test_polygon_provider_empty_results_writes_empty_parquet(
     manifest = current_manifest(mem_db, "EMPTY")
     assert manifest is not None
     assert manifest["row_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Live Polygon fetch -- one-off, real-key, excluded from `make test` by default
+# ---------------------------------------------------------------------------
+
+@pytest.mark.requires_polygon
+def test_live_polygon_spy_daily_is_reproducible(
+    mem_db, tmp_path,
+) -> None:
+    """One-off end-to-end test against the live Polygon API.
+
+    Marked ``requires_polygon``: excluded from the default ``make test``
+    run because it hits the live API and is subject to Polygon's free-
+    tier rate limit (5 req/min). Run explicitly with::
+
+        POLYGON_API_KEY=... pytest -m requires_polygon -v
+
+    Skipped unless ``POLYGON_API_KEY`` is set in the process environment.
+    Fetches ~3 weeks of SPY daily bars TWICE and confirms:
+
+    1. A Parquet file is written to disk each time.
+    2. A ``data.manifest_recorded`` event is appended to the log each
+       time (the events log is the source of truth).
+    3. The two Parquet files have an identical content hash (Polygon's
+       historical data is immutable, so identical queries return
+       identical bytes -- the manifest is reproducible). The same
+       content hash also appears in both manifest events.
+
+    This is the spec's "re-run to confirm it's reproducible" check,
+    expressed as a single test: two fetches with different clocks and
+    different output paths, same data range, and the data is identical.
+    """
+    api_key = os.environ.get("POLYGON_API_KEY")
+    if not api_key:
+        pytest.skip("POLYGON_API_KEY not set; live Polygon test skipped")
+
+    provider = PolygonProvider(api_key=api_key, timeout=30.0)
+
+    # January 2025: ~21 trading days (Jan 1 + MLK Day are holidays).
+    # 3 weeks of bars, fixed range so the test is reproducible.
+    path1 = tmp_path / "SPY_fetch1.parquet"
+    path2 = tmp_path / "SPY_fetch2.parquet"
+    clock1 = FrozenClock(at=datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC))
+    clock2 = FrozenClock(at=datetime(2026, 1, 16, 12, 0, 0, tzinfo=UTC))
+
+    # First fetch.
+    provider.fetch_daily_bars(
+        symbol="SPY", start_date="2025-01-02", end_date="2025-01-31",
+        conn=mem_db, clock=clock1, parquet_path=path1,
+    )
+    # Second fetch: same range, different clock (fetch_ts differs),
+    # different output path. Data should be identical.
+    provider.fetch_daily_bars(
+        symbol="SPY", start_date="2025-01-02", end_date="2025-01-31",
+        conn=mem_db, clock=clock2, parquet_path=path2,
+    )
+
+    # Two events in the log (one per fetch); the projection UPSERTs
+    # to a single (vendor=polygon, symbol=SPY) row.
+    rebuild_projections(mem_db)
+    events = mem_db.execute(
+        "SELECT id, payload FROM events "
+        "WHERE event_type = 'data.manifest_recorded' "
+        "ORDER BY id",
+    ).fetchall()
+    assert len(events) == 2
+    payload1 = json.loads(events[0]["payload"])
+    payload2 = json.loads(events[1]["payload"])
+
+    # Manifests agree on row_count and content_hash (data is identical).
+    assert payload1["row_count"] == payload2["row_count"] > 0
+    assert payload1["content_hash"] == payload2["content_hash"], (
+        f"Polygon returned different data: "
+        f"{payload1['content_hash']} != {payload2['content_hash']}"
+    )
+
+    # Parquet files exist on disk and the file bytes match the manifest.
+    assert path1.exists()
+    assert path2.exists()
+    file_hash1 = hashlib.sha256(path1.read_bytes()).hexdigest()
+    file_hash2 = hashlib.sha256(path2.read_bytes()).hexdigest()
+    assert file_hash1 == file_hash2 == payload1["content_hash"]
+
+    # The projection has ONE row (latest fetch wins via UPSERT).
+    manifest = current_manifest(mem_db, "SPY")
+    assert manifest is not None
+    assert manifest["row_count"] == payload1["row_count"]
+    assert manifest["content_hash"] == payload1["content_hash"]
+    assert manifest["fetch_ts"] == clock2.now().isoformat()  # newer fetch wins
