@@ -353,6 +353,91 @@ def test_rebuild_is_atomic_on_failure(
 
 
 # ---------------------------------------------------------------------------
+# Log-wins: the event log is the source of truth for projections
+# ---------------------------------------------------------------------------
+
+def test_log_overrides_a_corrupted_projection(mem_db: sqlite3.Connection) -> None:
+    """If a projection row disagrees with the log, rebuilding restores the
+    log-derived value. The log wins because rebuild_projections() truncates
+    every projection table before replaying.
+    """
+    # Clean rebuild from a known log.
+    _seed_curated_events(mem_db)
+    rebuild_projections(mem_db)
+
+    # Sabotage: lie about the current state of idea-1.  This is what an
+    # out-of-band UPDATE (a bug, a manual fix, a half-applied migration)
+    # would look like.  The event log still says idea-1 is "approved".
+    mem_db.execute(
+        "UPDATE current_ideas SET current_state = 'lying' "
+        "WHERE entity_id = 'idea-1'"
+    )
+    mem_db.commit()
+    sabotaged = mem_db.execute(
+        "SELECT current_state FROM current_ideas WHERE entity_id = 'idea-1'"
+    ).fetchone()
+    assert sabotaged is not None
+    assert sabotaged["current_state"] == "lying"  # confirm the sabotage stuck
+
+    # Rebuild.  The projection must snap back to what the log says.
+    rebuild_projections(mem_db)
+    row = mem_db.execute(
+        "SELECT current_state FROM current_ideas WHERE entity_id = 'idea-1'"
+    ).fetchone()
+    assert row is not None
+    assert row["current_state"] == "approved"
+
+
+def test_log_wins_even_after_a_partial_rebuild_then_more_events(
+    mem_db: sqlite3.Connection,
+) -> None:
+    """Append, rebuild, manually corrupt, append more, rebuild — the
+    corrupt row is overwritten and the new event is reflected.
+    """
+    ts = iter([_TS, _TS, _TS, _TS])
+
+    append_event(
+        conn=mem_db, event_type="idea.registered", entity_id="i",
+        actor="h", payload={}, clock=FrozenClock(at=next(ts)),
+    )
+    rebuild_projections(mem_db)
+
+    # Corrupt: claim i is "approved" even though no such event exists.
+    mem_db.execute(
+        "UPDATE current_ideas SET current_state = 'approved' WHERE entity_id = 'i'"
+    )
+    mem_db.commit()
+
+    # Now append the legitimate approval.
+    append_event(
+        conn=mem_db, event_type="idea.state_changed", entity_id="i",
+        actor="h", payload={"from": "registered", "to": "approved"},
+        clock=FrozenClock(at=next(ts)),
+    )
+    # And then an unrelated rejection against a different entity, to prove
+    # the rebuild walks the full log every time.
+    append_event(
+        conn=mem_db, event_type="idea.rejected", entity_id="j",
+        actor="h", payload={"fingerprint": "fp-j", "asset": "X", "reason": "r"},
+        clock=FrozenClock(at=next(ts)),
+    )
+
+    rebuild_projections(mem_db)
+
+    # i is legitimately approved (now matches the log).
+    i_row = mem_db.execute(
+        "SELECT current_state FROM current_ideas WHERE entity_id = 'i'"
+    ).fetchone()
+    assert i_row is not None and i_row["current_state"] == "approved"
+
+    # j is in the rejection ledger too.
+    fp = mem_db.execute(
+        "SELECT fingerprint FROM rejection_ledger WHERE fingerprint = 'fp-j'"
+    ).fetchone()
+    assert fp is not None
+
+
+# ---------------------------------------------------------------------------
 # Discipline
 # ---------------------------------------------------------------------------
 
