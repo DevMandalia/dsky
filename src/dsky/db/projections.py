@@ -19,6 +19,7 @@ PROJECTION_TABLES: tuple[str, ...] = (
     "playbooks",
     "paper_positions",
     "attribution_history",
+    "data_manifest",
 )
 
 
@@ -96,6 +97,44 @@ def _handle_playbook_monitoring_changed(
     )
 
 
+def _handle_data_manifest_recorded(
+    conn: sqlite3.Connection, e: ReplayedEvent,
+) -> None:
+    """Upsert the current (vendor, symbol) manifest entry.
+
+    The data_manifest table is keyed on (vendor, symbol) so a refetch
+    replaces the previous row in place. Full history of all fetches is
+    preserved in the events log; the projection is the *current* state.
+    """
+    conn.execute(
+        """
+        INSERT INTO data_manifest
+            (vendor, symbol, fetch_ts, date_start, date_end,
+             row_count, content_hash, parquet_path, last_event_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(vendor, symbol) DO UPDATE SET
+            fetch_ts      = excluded.fetch_ts,
+            date_start    = excluded.date_start,
+            date_end      = excluded.date_end,
+            row_count     = excluded.row_count,
+            content_hash  = excluded.content_hash,
+            parquet_path  = excluded.parquet_path,
+            last_event_id = excluded.last_event_id
+        """,
+        (
+            str(e.payload["vendor"]),
+            str(e.payload["symbol"]),
+            str(e.payload["fetch_ts"]),
+            str(e.payload["date_start"]),
+            str(e.payload["date_end"]),
+            int(e.payload["row_count"]),
+            str(e.payload["content_hash"]),
+            str(e.payload["parquet_path"]),
+            e.id,
+        ),
+    )
+
+
 # ---------- shared helpers -------------------------------------------------
 
 def _upsert_current_idea(
@@ -123,6 +162,7 @@ _HANDLERS: dict[str, ProjectionHandler] = {
     "idea.rejected":               _handle_idea_rejected,
     "playbook.approved":           _handle_playbook_approved,
     "playbook.monitoring_changed": _handle_playbook_monitoring_changed,
+    "data.manifest_recorded":      _handle_data_manifest_recorded,
 }
 
 

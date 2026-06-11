@@ -53,3 +53,26 @@ CREATE TABLE IF NOT EXISTS attribution_history (
     -- Placeholder; populated by a later step (research/attribution rolls).
     id  INTEGER PRIMARY KEY
 );
+
+-- -----------------------------------------------------------------------
+-- Data manifest (provenance for fetched bar data)
+--
+-- AGENTS.md: provenance is recorded BEFORE the data is usable. The
+-- dsky.data.bars.load_bars() function refuses to return data whose
+-- parquet_path has no row in this table. Rows are populated exclusively
+-- by db/projections.py:_handle_data_manifest_recorded, which reads
+-- data.manifest_recorded events from the events log.
+-- -----------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS data_manifest (
+    vendor         TEXT    NOT NULL,
+    symbol         TEXT    NOT NULL,
+    fetch_ts       TEXT    NOT NULL,
+    date_start     TEXT    NOT NULL,
+    date_end       TEXT    NOT NULL,
+    row_count      INTEGER NOT NULL,
+    content_hash   TEXT    NOT NULL,
+    parquet_path   TEXT    NOT NULL,
+    last_event_id  INTEGER NOT NULL,
+    PRIMARY KEY (vendor, symbol)
+);

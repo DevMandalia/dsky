@@ -4,7 +4,9 @@ version = "0.0.0"
 description = "Direction-Sky: a pre-registered, append-only quant research system."
 requires-python = ">=3.12"
 readme = "README.md"
-dependencies = []
+dependencies = [
+    "polars>=1.0",
+]
 
 [build-system]
 requires = ["hatchling"]
