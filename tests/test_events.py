@@ -215,7 +215,15 @@ _WRITE_STATEMENTS = ("INSERT ", "UPDATE ", "DELETE ")
 # API to corrupt the DB directly — that is their purpose.  The write-path
 # rule in AGENTS.md targets production modules, not the test suite.
 _WRITE_SCAN_ROOT = SRC_ROOT
-_ALLOWED_WRITE_FILE = SRC_ROOT / "db" / "events.py"
+_ALLOWED_WRITE_FILES: frozenset[Path] = frozenset(
+    {
+        # The events spine: append_event() is the only writer to `events`.
+        SRC_ROOT / "db" / "events.py",
+        # The projection read-models: rebuild_projections() is the only writer
+        # to any of the projection tables, and it works by truncate + replay.
+        SRC_ROOT / "db" / "projections.py",
+    }
+)
 
 
 def _iter_src_python_files() -> Iterator[Path]:
@@ -250,10 +258,10 @@ def test_only_events_py_issues_db_writes() -> None:
     Scope: src/dsky/ only.  Test code is excluded by design (tamper tests
     must corrupt the DB directly; that is how they prove verify_chain works).
     """
-    allowed = _ALLOWED_WRITE_FILE.resolve()
+    allowed = {p.resolve() for p in _ALLOWED_WRITE_FILES}
     offenders: list[str] = []
     for path in _iter_src_python_files():
-        if path.resolve() == allowed:
+        if path.resolve() in allowed:
             continue
         text = path.read_text(encoding="utf-8")
         keywords = _has_raw_write_string(text)
