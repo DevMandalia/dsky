@@ -428,7 +428,8 @@ def test_log_wins_even_after_a_partial_rebuild_then_more_events(
     i_row = mem_db.execute(
         "SELECT current_state FROM current_ideas WHERE entity_id = 'i'"
     ).fetchone()
-    assert i_row is not None and i_row["current_state"] == "approved"
+    assert i_row is not None
+    assert i_row["current_state"] == "approved"
 
     # j is in the rejection ledger too.
     fp = mem_db.execute(
