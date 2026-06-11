@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Direction-Sky · Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:          #fafafa;
+  --card:        #ffffff;
+  --border:      #e5e7eb;
+  --border-strong: #d1d5db;
+  --text:        #0f172a;
+  --text-muted:  #475569;
+  --text-dim:    #94a3b8;
+  --code-bg:     #f1f5f9;
+  --code-text:   #0f172a;
+  --code-border: #e2e8f0;
+  --accent:      #4f46e5;
+  --accent-bg:   #eef2ff;
+  --accent-text: #3730a3;
+  --ok:          #15803d;
+  --ok-bg:       #f0fdf4;
+  --warn:        #b91c1c;
+  --warn-bg:     #fef2f2;
+  --note:        #0c4a6e;
+  --note-bg:     #f0f9ff;
+  --note-border: #0284c7;
+
+  --c-clock:        #b45309;  --c-clock-bg:        #fef3c7;
+  --c-events:       #1d4ed8;  --c-events-bg:       #dbeafe;
+  --c-projections:  #047857;  --c-projections-bg:  #d1fae5;
+  --c-watchdog:     #b91c1c;  --c-watchdog-bg:     #fee2e2;
+  --c-time:         #6d28d9;  --c-time-bg:         #ede9fe;
+  --c-schema:       #475569;  --c-schema-bg:       #f1f5f9;
+  --c-tests:        #4338ca;  --c-tests-bg:        #e0e7ff;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.mono, code {
+  font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 13.5px;
+  font-feature-settings: "calt" 1;
+}
+
+code {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: var(--code-text);
+  font-size: 12.5px;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ============ TOP BAR ============ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(250, 250, 250, 0.85);
+  backdrop-filter: saturate(180%) blur(8px);
+  -webkit-backdrop-filter: saturate(180%) blur(8px);
+  border-bottom: 1px solid var(--border);
+  height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+}
+
+.topbar .brand {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.topbar .breadcrumb {
+  color: var(--text-dim);
+  margin: 0 8px;
+  font-weight: 400;
+}
+
+.topbar .crumb {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.topbar .right {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.topbar .right a {
+  color: var(--text-muted);
+}
+.topbar .right a:hover { color: var(--text); text-decoration: none; }
+
+/* ============ LAYOUT ============ */
+.layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+  gap: 48px;
+}
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .toc { display: none; }
+}
+
+/* ============ TOC ============ */
+.toc {
+  position: sticky;
+  top: 52px;
+  align-self: start;
+  height: calc(100vh - 52px);
+  padding: 32px 0;
+  overflow-y: auto;
+  font-size: 13.5px;
+}
+
+.toc-header {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.toc-sub {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  margin-bottom: 24px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.toc nav { display: flex; flex-direction: column; gap: 2px; }
+.toc a {
+  display: block;
+  padding: 6px 12px;
+  color: var(--text-muted);
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.toc a:hover {
+  background: #f1f5f9;
+  color: var(--text);
+  text-decoration: none;
+}
+.toc a.active {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  border-left-color: var(--accent);
+}
+
+.toc-group {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin: 20px 0 6px;
+  padding: 0 12px;
+}
+
+/* ============ MAIN ============ */
+main {
+  padding: 40px 0 96px;
+  min-width: 0;
+  max-width: 860px;
+}
+
+.hero {
+  margin-bottom: 56px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.hero h1 {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+
+.hero .lede {
+  font-size: 17px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+  max-width: 640px;
+}
+
+.hero .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.tag.solid {
+  background: var(--text);
+  color: white;
+  border-color: var(--text);
+}
+
+/* ============ SECTIONS ============ */
+section {
+  margin: 64px 0;
+  scroll-margin-top: 72px;
+}
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.section-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+.section-title {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0;
+  color: var(--text);
+}
+
+.section-lede {
+  font-size: 15.5px;
+  color: var(--text-muted);
+  margin: 0 0 24px;
+  max-width: 700px;
+}
+
+/* ============ DIAGRAMS ============ */
+.figure {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 32px;
+  margin: 24px 0;
+  overflow-x: auto;
+}
+
+.figure svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.figure-caption {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin: 12px 0 0;
+  text-align: center;
+  font-style: italic;
+}
+
+/* ============ CALLOUTS ============ */
+.callout {
+  border: 1px solid;
+  border-left-width: 4px;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 20px 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.callout strong { font-weight: 600; }
+.callout p { margin: 4px 0; }
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child  { margin-bottom: 0; }
+
+.callout-info  { background: var(--note-bg);    border-color: var(--note-border); color: var(--note); }
+.callout-info strong  { color: var(--note); }
+.callout-warn  { background: var(--warn-bg);    border-color: var(--warn); color: var(--warn); }
+.callout-warn strong  { color: var(--warn); }
+.callout-ok    { background: var(--ok-bg);      border-color: var(--ok); color: var(--ok); }
+.callout-ok strong    { color: var(--ok); }
+
+/* ============ CODE BLOCKS (used in section 5) ============ */
+.code-block {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 18px 22px;
+  margin: 16px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+}
+
+.code-block .k { color: #f472b6; }  /* keyword */
+.code-block .s { color: #86efac; }  /* string */
+.code-block .n { color: #fbbf24; }  /* number */
+.code-block .c { color: #64748b; font-style: italic; }  /* comment */
+.code-block .f { color: #93c5fd; }  /* function */
+.code-block .v { color: #e2e8f0; }  /* var */
+
+.code-header {
+  background: #f1f5f9;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+}
+.code-header + .code-block {
+  border-radius: 0 0 8px 8px;
+  margin-top: 0;
+}
+
+/* ============ SUBSYSTEM LEGEND STRIPE ============ */
+.layer {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-left: 4px solid;
+  background: var(--card);
+  border-radius: 10px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+.layer-stripe {
+  width: 8px;
+  flex-shrink: 0;
+}
+.layer-body { flex: 1; padding: 16px 22px; }
+.layer-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.layer-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+}
+.layer-file {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.layer-desc {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+.layer-fn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  color: var(--code-text);
+}
+
+.layer.clock        { border-left-color: var(--c-clock); }
+.layer.clock        .layer-stripe { background: var(--c-clock); }
+.layer.events       { border-left-color: var(--c-events); }
+.layer.events       .layer-stripe { background: var(--c-events); }
+.layer.projections  { border-left-color: var(--c-projections); }
+.layer.projections  .layer-stripe { background: var(--c-projections); }
+.layer.watchdog     { border-left-color: var(--c-watchdog); }
+.layer.watchdog     .layer-stripe { background: var(--c-watchdog); }
+.layer.schema       { border-left-color: var(--c-schema); }
+.layer.schema       .layer-stripe { background: var(--c-schema); }
+.layer.tests        { border-left-color: var(--c-tests); }
+.layer.tests        .layer-stripe { background: var(--c-tests); }
+
+/* ============ TABLE-LIKE GRID (for schema) ============ */
+.schema-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.schema-table {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 13px;
+}
+.schema-table .t-head {
+  background: var(--code-bg);
+  padding: 10px 16px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.schema-table .t-head .name {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text);
+}
+.schema-table .t-head .dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--c-events);
+}
+.schema-table.proj .t-head .dot { background: var(--c-projections); }
+.schema-table.placeholder .t-head .dot { background: var(--c-schema); }
+
+.schema-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+}
+.schema-table td {
+  padding: 6px 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.schema-table tr:last-child td { border-bottom: none; }
+.schema-table .col-name { color: var(--text); font-weight: 600; }
+.schema-table .col-type { color: var(--text-dim); font-size: 11.5px; }
+.schema-table .pk { color: var(--accent); font-weight: 700; margin-right: 6px; }
+.schema-table .idx {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  background: #f8fafc;
+  padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* ============ TEST TREE ============ */
+.test-tree {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.85;
+  margin: 16px 0;
+}
+.test-tree .dir { color: var(--accent); font-weight: 600; }
+.test-tree .file { color: var(--text); font-weight: 600; }
+.test-tree .count { color: var(--text-dim); font-weight: 400; margin-left: 8px; }
+.test-tree ul { list-style: none; padding-left: 24px; margin: 4px 0; }
+.test-tree li::before { content: "├─ "; color: var(--text-dim); }
+.test-tree li:last-child::before { content: "└─ "; }
+
+.test-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.test-summary .stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+.test-summary .num {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text);
+  line-height: 1.1;
+}
+.test-summary .lbl {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+
+/* ============ SCAN DIAGRAM ============ */
+.scan-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+@media (max-width: 700px) {
+  .scan-grid { grid-template-columns: 1fr; }
+}
+
+.scan-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--c-watchdog);
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+.scan-card .head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.scan-card .head .id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--c-watchdog);
+  background: var(--c-watchdog-bg);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.scan-card .head .title {
+  font-weight: 700;
+  font-size: 14px;
+}
+.scan-card p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+.scan-card ul {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.scan-card ul li {
+  padding: 2px 0;
+  color: var(--text-muted);
+}
+.scan-card ul li code {
+  background: var(--code-bg);
+  color: var(--text);
+  font-size: 11.5px;
+}
+
+/* ============ FOOTER ============ */
+footer {
+  margin-top: 96px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-dim);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+footer .mono { font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Direction-Sky</div>
+  <div class="breadcrumb">/</div>
+  <div class="crumb">Architecture</div>
+  <div class="right">
+    <a href="https://github.com/">v0.4</a> &nbsp;·&nbsp; <a href="../AGENTS.md">AGENTS.md</a>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- =================== TOC =================== -->
+  <aside class="toc">
+    <div class="toc-header">On this page</div>
+    <div class="toc-sub">/docs/architecture</div>
+    <nav>
+      <a href="#overview">System overview</a>
+      <a href="#event-log">Event log</a>
+      <a href="#projections">Projections</a>
+      <a href="#clock">Clock</a>
+      <a href="#discipline">Discipline scans</a>
+      <a href="#time">Time rules</a>
+      <a href="#schema">Schema</a>
+      <a href="#tests">Test suite</a>
+    </nav>
+    <div class="toc-group">Source layout</div>
+    <nav>
+      <a href="#" style="pointer-events:none; color: var(--text-dim);">src/dsky/</a>
+      <a href="#" style="pointer-events:none; color: var(--text-dim);">src/dsky/db/</a>
+      <a href="#" style="pointer-events:none; color: var(--text-dim);">src/dsky/advisory/</a>
+      <a href="#" style="pointer-events:none; color: var(--text-dim);">src/dsky/lifecycle/</a>
+      <a href="#" style="pointer-events:none; color: var(--text-dim);">src/dsky/research/</a>
+      <a href="#" style="pointer-events:none; color: var(--text-dim);">src/dsky/data/</a>
+      <a href="#" style="pointer-events:none; color: var(--text-dim);">tests/</a>
+    </nav>
+  </aside>
+
+  <!-- =================== MAIN =================== -->
+  <main>
+
+    <div class="hero">
+      <h1>Architecture</h1>
+      <p class="lede">Pre-registered, append-only quant research system. The event log is the source of truth; the projections are derived state; the discipline scans enforce the invariants on every commit.</p>
+      <div class="meta">
+        <span class="tag solid">main</span>
+        <span class="tag">Python 3.12</span>
+        <span class="tag">SQLite (WAL)</span>
+        <span class="tag">0 runtime deps</span>
+        <span class="tag">29 tests</span>
+        <span class="tag">ruff + mypy strict</span>
+      </div>
+    </div>
+
+    <!-- ============================================ 1. SYSTEM OVERVIEW ============================================ -->
+    <section id="overview">
+      <div class="section-header">
+        <span class="section-num">01</span>
+        <h2 class="section-title">System overview</h2>
+      </div>
+      <p class="section-lede">Five subsystems stack on top of each other. Tests enforce properties; projections read from events; the engine applies the schema; the clock is the only legal source of <code>now</code>.</p>
+
+      <div class="figure">
+        <svg viewBox="0 0 820 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Layered system architecture: tests on top, then projections, events, engine, schema, clock at the base">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+            </marker>
+          </defs>
+
+          <!-- Layer 5: Tests -->
+          <g>
+            <rect x="60" y="20" width="700" height="100" rx="10" fill="#eef2ff" stroke="#4338ca" stroke-width="1.5"/>
+            <rect x="60" y="20" width="6" height="100" fill="#4338ca"/>
+            <text x="84" y="48" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#312e81">5 · Tests</text>
+            <text x="84" y="68" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#64748b">tests/  ·  pytest --strict</text>
+            <text x="84" y="90" font-family="JetBrains Mono, monospace" font-size="12" fill="#312e81">29 tests · 4 files · 0.08s</text>
+            <text x="84" y="108" font-family="Inter, sans-serif" font-size="11.5" fill="#64748b">Enforces: chain integrity, no secret clocks, no rogue writes, projection invariants.</text>
+          </g>
+          <line x1="410" y1="120" x2="410" y2="148" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="430" y="140" font-family="Inter, sans-serif" font-size="10.5" fill="#64748b" font-style="italic">runs against</text>
+
+          <!-- Layer 4: Projections -->
+          <g>
+            <rect x="60" y="150" width="700" height="100" rx="10" fill="#d1fae5" stroke="#047857" stroke-width="1.5"/>
+            <rect x="60" y="150" width="6" height="100" fill="#047857"/>
+            <text x="84" y="178" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#064e3b">4 · Projections</text>
+            <text x="84" y="198" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#64748b">src/dsky/db/projections.py</text>
+            <text x="84" y="220" font-family="JetBrains Mono, monospace" font-size="12" fill="#064e3b">rebuild_projections(conn)</text>
+            <text x="84" y="238" font-family="Inter, sans-serif" font-size="11.5" fill="#64748b">Replays the event log. Atomic via try/except/rollback/raise. The only writer to projection tables.</text>
+          </g>
+          <line x1="410" y1="250" x2="410" y2="278" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="430" y="270" font-family="Inter, sans-serif" font-size="10.5" fill="#64748b" font-style="italic">reads from</text>
+
+          <!-- Layer 3: Event log -->
+          <g>
+            <rect x="60" y="280" width="700" height="100" rx="10" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5"/>
+            <rect x="60" y="280" width="6" height="100" fill="#1d4ed8"/>
+            <text x="84" y="308" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">3 · Event log (single write path)</text>
+            <text x="84" y="328" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#64748b">src/dsky/db/events.py</text>
+            <text x="84" y="350" font-family="JetBrains Mono, monospace" font-size="12" fill="#1e3a8a">append_event(... clock: Clock)  ·  verify_chain(conn)</text>
+            <text x="84" y="368" font-family="Inter, sans-serif" font-size="11.5" fill="#64748b">Hash-chained. Append-only. <tspan font-weight="600" fill="#1e3a8a">The only writer to the events table.</tspan></text>
+          </g>
+          <line x1="410" y1="380" x2="410" y2="408" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="430" y="400" font-family="Inter, sans-serif" font-size="10.5" fill="#64748b" font-style="italic">persists via</text>
+
+          <!-- Layer 2: Engine -->
+          <g>
+            <rect x="60" y="410" width="700" height="100" rx="10" fill="#ffffff" stroke="#475569" stroke-width="1.5"/>
+            <rect x="60" y="410" width="6" height="100" fill="#475569"/>
+            <text x="84" y="438" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#0f172a">2 · Engine</text>
+            <text x="84" y="458" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#64748b">src/dsky/db/engine.py</text>
+            <text x="84" y="480" font-family="JetBrains Mono, monospace" font-size="12" fill="#0f172a">open_db(path) → Connection</text>
+            <text x="84" y="498" font-family="Inter, sans-serif" font-size="11.5" fill="#64748b">PRAGMA journal_mode=WAL · PRAGMA foreign_keys=ON · applies schema.sql</text>
+          </g>
+          <line x1="410" y1="510" x2="410" y2="538" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="430" y="530" font-family="Inter, sans-serif" font-size="10.5" fill="#64748b" font-style="italic">creates from</text>
+
+          <!-- Layer 1: Schema -->
+          <g>
+            <rect x="60" y="540" width="700" height="80" rx="10" fill="#f1f5f9" stroke="#475569" stroke-width="1.5"/>
+            <rect x="60" y="540" width="6" height="80" fill="#475569"/>
+            <text x="84" y="568" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#0f172a">1 · Schema</text>
+            <text x="84" y="588" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#64748b">src/dsky/db/schema.sql</text>
+            <text x="84" y="608" font-family="Inter, sans-serif" font-size="11.5" fill="#475569">events · current_ideas · rejection_ledger · playbooks · paper_positions · attribution_history</text>
+          </g>
+          <line x1="410" y1="620" x2="410" y2="648" stroke="#b45309" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="430" y="640" font-family="Inter, sans-serif" font-size="10.5" fill="#b45309" font-style="italic" font-weight="600">every ts comes from</text>
+
+          <!-- Layer 0: Clock -->
+          <g>
+            <rect x="60" y="650" width="700" height="60" rx="10" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+            <rect x="60" y="650" width="6" height="60" fill="#b45309"/>
+            <text x="84" y="678" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#78350f">0 · Clock  (only legal "now")</text>
+            <text x="84" y="697" font-family="JetBrains Mono, monospace" font-size="12" fill="#78350f">src/dsky/clock.py  ·  Clock (Protocol) · SystemClock · FrozenClock</text>
+          </g>
+        </svg>
+        <p class="figure-caption">Figure 1.1 — Layered architecture. Arrows on the right show the direction of dependency and data flow.</p>
+      </div>
+
+      <div class="callout callout-info">
+        <p><strong>Reading direction:</strong> the codebase is built bottom-up (clock → schema → engine → events → projections → tests). Code in any layer may import from any layer below it; never the other way.</p>
+      </div>
+    </section>
+
+    <!-- ============================================ 2. EVENT LOG ============================================ -->
+    <section id="event-log">
+      <div class="section-header">
+        <span class="section-num">02</span>
+        <h2 class="section-title">Event log</h2>
+      </div>
+      <p class="section-lede">The single write path. One function, <code>append_event()</code>, is allowed to insert into the <code>events</code> table. Each row's <code>hash</code> is <code>SHA-256(prev_hash · canonical_payload · ts)</code>, so any mutation is detectable.</p>
+
+      <div class="figure">
+        <svg viewBox="0 0 820 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sequence diagram of append_event()">
+          <defs>
+            <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+            </marker>
+          </defs>
+
+          <!-- Lifelines (4 actors) -->
+          <g font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#0f172a" text-anchor="middle">
+            <text x="100" y="28">Caller</text>
+            <text x="290" y="28">append_event()</text>
+            <text x="500" y="28">_canonical / _compute_hash</text>
+            <text x="710" y="28">events table</text>
+          </g>
+          <g stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 3">
+            <line x1="100" y1="40" x2="100" y2="620"/>
+            <line x1="290" y1="40" x2="290" y2="620"/>
+            <line x1="500" y1="40" x2="500" y2="620"/>
+            <line x1="710" y1="40" x2="710" y2="620"/>
+          </g>
+
+          <!-- Message 1: append_event call -->
+          <line x1="100" y1="70" x2="282" y2="70" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+          <text x="195" y="62" font-family="JetBrains Mono, monospace" font-size="11" fill="#0f172a" text-anchor="middle">append_event(conn, event_type, entity_id, actor, payload, clock: Clock)</text>
+
+          <!-- Step 1: ts = clock.now() -->
+          <line x1="290" y1="110" x2="104" y2="110" stroke="#1d4ed8" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arr2)"/>
+          <text x="200" y="103" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#1d4ed8">ts = clock.now().isoformat()</text>
+
+          <!-- Step 2: _canonical -->
+          <line x1="290" y1="145" x2="492" y2="145" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+          <text x="390" y="138" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#0f172a" text-anchor="middle">payload_json = _canonical(payload)</text>
+          <text x="390" y="160" font-family="Inter, sans-serif" font-size="10" fill="#64748b" font-style="italic" text-anchor="middle">sort_keys=True · separators=(",",":") · ensure_ascii=True</text>
+
+          <!-- Step 3: SELECT prev_hash -->
+          <line x1="290" y1="195" x2="702" y2="195" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+          <text x="495" y="188" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#0f172a">SELECT hash FROM events ORDER BY id DESC LIMIT 1</text>
+          <line x1="710" y1="220" x2="298" y2="220" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#arr2)"/>
+          <text x="500" y="236" font-family="Inter, sans-serif" font-size="10" fill="#64748b" font-style="italic">prev_hash = row["hash"]  <tspan font-weight="600">or</tspan>  _GENESIS_SEED = "dsky-genesis-v1"  (if empty)</text>
+
+          <!-- Step 4: _compute_hash -->
+          <line x1="290" y1="270" x2="492" y2="270" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+          <text x="390" y="263" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#0f172a" text-anchor="middle">hash = _compute_hash(prev_hash, payload_json, ts)</text>
+          <text x="390" y="285" font-family="Inter, sans-serif" font-size="10" fill="#64748b" font-style="italic" text-anchor="middle">SHA-256(prev_hash ‖ canonical_payload ‖ ts)</text>
+
+          <!-- Step 5: INSERT -->
+          <line x1="290" y1="320" x2="702" y2="320" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+          <text x="495" y="313" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#0f172a">INSERT INTO events (ts, event_type, entity_id, actor, payload, prev_hash, hash)</text>
+          <line x1="710" y1="345" x2="298" y2="345" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#arr2)"/>
+          <text x="500" y="362" font-family="Inter, sans-serif" font-size="10" fill="#64748b" font-style="italic">VALUES (ts, event_type, entity_id, actor, payload_json, prev_hash, hash)</text>
+
+          <!-- Step 6: conn.commit (implicit) -->
+          <text x="290" y="395" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#475569">conn.commit()</text>
+          <text x="310" y="395" font-family="Inter, sans-serif" font-size="10" fill="#64748b" font-style="italic">← row committed, hash column is UNIQUE so a collision aborts</text>
+
+          <!-- Return id -->
+          <line x1="290" y1="425" x2="108" y2="425" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#arr2)"/>
+          <text x="200" y="418" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#0f172a" text-anchor="middle">return id  (cursor.lastrowid)</text>
+
+          <!-- Side panel: chain -->
+          <g transform="translate(80, 480)">
+            <text x="0" y="0" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#0f172a">Result: events table after N calls</text>
+            <g font-family="JetBrains Mono, monospace" font-size="11" fill="#0f172a">
+              <text x="0" y="22">id=1 · prev_hash=<tspan fill="#b45309">"dsky-genesis-v1"</tspan> · hash=<tspan fill="#047857">h₁</tspan> · payload=…</text>
+              <text x="0" y="40">id=2 · prev_hash=<tspan fill="#b45309">h₁</tspan>              · hash=<tspan fill="#047857">h₂</tspan> · payload=…</text>
+              <text x="0" y="58">id=3 · prev_hash=<tspan fill="#b45309">h₂</tspan>              · hash=<tspan fill="#047857">h₃</tspan> · payload=…</text>
+              <text x="0" y="76" fill="#64748b">…</text>
+              <text x="0" y="94">id=N · prev_hash=<tspan fill="#b45309">h_{N-1}</tspan>          · hash=<tspan fill="#047857">h_N</tspan> · payload=…</text>
+            </g>
+            <text x="0" y="120" font-family="Inter, sans-serif" font-size="11" fill="#64748b" font-style="italic">Each row's prev_hash is the previous row's hash. verify_chain() recomputes and flags the first mismatch.</text>
+          </g>
+        </svg>
+        <p class="figure-caption">Figure 2.1 — The append_event() call sequence. Dashed return arrows; solid forward arrows.</p>
+      </div>
+
+      <div class="callout callout-info">
+        <p><strong>Why a hash chain?</strong> because the only thing that's append-only in SQLite is convention. The hash turns the convention into a fact: a row whose payload was edited post-hoc is no longer consistent with its own <code>hash</code>, and the very next row's <code>prev_hash</code> is no longer consistent either. <code>verify_chain()</code> walks the whole log in one pass and returns the id of the first bad row, or <code>None</code> if the log is intact.</p>
+      </div>
+    </section>
+
+    <!-- ============================================ 3. PROJECTIONS ============================================ -->
+    <section id="projections">
+      <div class="section-header">
+        <span class="section-num">03</span>
+        <h2 class="section-title">Projections</h2>
+      </div>
+      <p class="section-lede"><code>rebuild_projections(conn)</code> is the only writer to any projection table. It truncates them all, then replays the event log in <code>id</code> order, dispatching each event to a handler looked up in <code>_HANDLERS</code>.</p>
+
+      <div class="figure">
+        <svg viewBox="0 0 820 740" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Flowchart of rebuild_projections()">
+          <defs>
+            <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+            </marker>
+            <marker id="arr3ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#047857"/>
+            </marker>
+            <marker id="arr3err" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/>
+            </marker>
+          </defs>
+
+          <!-- Entry -->
+          <g>
+            <rect x="240" y="20" width="340" height="56" rx="28" fill="#d1fae5" stroke="#047857" stroke-width="1.5"/>
+            <text x="410" y="45" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="#064e3b">rebuild_projections(conn)</text>
+            <text x="410" y="62" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#475569">entry point — the only writer to projection tables</text>
+          </g>
+
+          <line x1="410" y1="76" x2="410" y2="104" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+
+          <!-- Begin tx -->
+          <g>
+            <rect x="240" y="106" width="340" height="44" rx="8" fill="#ffffff" stroke="#475569" stroke-width="1.5"/>
+            <text x="410" y="132" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="#0f172a">begin implicit transaction</text>
+          </g>
+          <line x1="410" y1="150" x2="410" y2="178" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+
+          <!-- Loop: DELETE -->
+          <g>
+            <rect x="180" y="180" width="460" height="60" rx="8" fill="#ffffff" stroke="#475569" stroke-width="1.5"/>
+            <text x="410" y="200" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="#0f172a">for table in PROJECTION_TABLES:</text>
+            <text x="410" y="220" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#b91c1c">    conn.execute("DELETE FROM " + table)</text>
+          </g>
+          <line x1="410" y1="240" x2="410" y2="268" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+
+          <!-- Read events -->
+          <g>
+            <rect x="180" y="270" width="460" height="60" rx="8" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5"/>
+            <text x="410" y="290" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="#1e3a8a">rows = SELECT id, ts, event_type, entity_id, actor, payload</text>
+            <text x="410" y="310" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="#1e3a8a">       FROM events ORDER BY id</text>
+          </g>
+          <line x1="410" y1="330" x2="410" y2="358" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+
+          <!-- Loop: for each row -->
+          <g>
+            <rect x="180" y="360" width="460" height="80" rx="8" fill="#ffffff" stroke="#475569" stroke-width="1.5"/>
+            <text x="410" y="380" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="#0f172a">for row in rows:</text>
+            <text x="410" y="398" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#0f172a">    event = ReplayedEvent.from_row(row)</text>
+            <text x="410" y="416" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#0f172a">    handler = _HANDLERS.get(event.event_type)</text>
+            <text x="410" y="432" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#047857">    if handler: handler(conn, event)</text>
+          </g>
+          <line x1="410" y1="440" x2="410" y2="468" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+
+          <!-- Decision: any exception? -->
+          <g>
+            <polygon points="410,470 580,560 410,650 240,560" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+            <text x="410" y="555" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#78350f">any exception raised?</text>
+            <text x="410" y="575" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#78350f">try: ...   except BaseException:</text>
+          </g>
+
+          <!-- No → commit (left-down) -->
+          <text x="600" y="600" font-family="Inter, sans-serif" font-size="11" fill="#047857" font-weight="600">No</text>
+          <line x1="580" y1="560" x2="700" y2="560" stroke="#047857" stroke-width="1.5" marker-end="url(#arr3ok)"/>
+
+          <g>
+            <rect x="700" y="540" width="110" height="40" rx="8" fill="#d1fae5" stroke="#047857" stroke-width="1.5"/>
+            <text x="755" y="565" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="#064e3b">COMMIT</text>
+          </g>
+
+          <!-- Yes → rollback (left) -->
+          <text x="220" y="540" font-family="Inter, sans-serif" font-size="11" fill="#b91c1c" font-weight="600">Yes</text>
+          <line x1="240" y1="560" x2="120" y2="560" stroke="#b91c1c" stroke-width="1.5" marker-end="url(#arr3err)"/>
+
+          <g>
+            <rect x="10" y="540" width="110" height="40" rx="8" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5"/>
+            <text x="65" y="558" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="#7f1d1d">ROLLBACK</text>
+            <text x="65" y="572" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#7f1d1d">+ raise</text>
+          </g>
+
+          <!-- Side: dispatch table -->
+          <g transform="translate(530, 670)">
+            <text x="0" y="0" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#0f172a">_HANDLERS dispatch</text>
+            <g font-family="JetBrains Mono, monospace" font-size="10.5" fill="#0f172a">
+              <text x="0" y="18">"idea.registered"             → _handle_idea_registered</text>
+              <text x="0" y="32">"idea.state_changed"          → _handle_idea_state_changed</text>
+              <text x="0" y="46">"idea.rejected"               → _handle_idea_rejected</text>
+              <text x="0" y="60">"playbook.approved"           → _handle_playbook_approved</text>
+              <text x="0" y="74">"playbook.monitoring_changed" → _handle_playbook_monitoring_changed</text>
+              <text x="0" y="88" fill="#64748b">unregistered event_types → no-op, skipped</text>
+            </g>
+          </g>
+        </svg>
+        <p class="figure-caption">Figure 3.1 — rebuild_projections() flow. The implicit transaction guarantees all-or-nothing: either every projection is rebuilt consistently, or the connection is left exactly as it was.</p>
+      </div>
+
+      <div class="callout callout-info">
+        <p><strong>Properties verified by tests:</strong></p>
+        <ul style="margin: 4px 0 0; padding-left: 20px;">
+          <li><strong>Idempotent</strong> — <code>rebuild(rebuild(x)) == rebuild(x)</code></li>
+          <li><strong>Deterministic</strong> — two rebuilds on the same log are byte-identical at the column level</li>
+          <li><strong>Atomic</strong> — a mid-rebuild failure rolls back to the prior projection state, not a half-built one</li>
+          <li><strong>Log wins</strong> — a corrupted projection row is overwritten on the next rebuild (the log is the source of truth)</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============================================ 4. CLOCK ============================================ -->
+    <section id="clock">
+      <div class="section-header">
+        <span class="section-num">04</span>
+        <h2 class="section-title">Clock</h2>
+      </div>
+      <p class="section-lede">The <code>Clock</code> protocol is the only legal source of <code>now</code>. The discipline test scans the entire repo (excluding caches) for any <code>datetime.now()</code> call not on a <code>Clock</code> receiver — and fails the suite if it finds one.</p>
+
+      <div class="figure">
+        <svg viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Clock protocol with SystemClock and FrozenClock implementations">
+          <defs>
+            <marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+            </marker>
+            <marker id="arr4i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#b45309"/>
+            </marker>
+          </defs>
+
+          <!-- Protocol (top) -->
+          <g>
+            <rect x="240" y="20" width="340" height="100" rx="10" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+            <text x="410" y="44" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#92400e">Protocol</text>
+            <text x="410" y="64" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#78350f">Clock</text>
+            <line x1="260" y1="74" x2="560" y2="74" stroke="#fbbf24" stroke-width="1"/>
+            <text x="410" y="92" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="#78350f">def now(self) -> datetime</text>
+            <text x="410" y="108" text-anchor="middle" font-family="Inter, sans-serif" font-size="10.5" fill="#92400e" font-style="italic">return value must be tz-aware (UTC)</text>
+          </g>
+
+          <!-- Inheritance arrows (dashed) -->
+          <line x1="350" y1="120" x2="200" y2="200" stroke="#b45309" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr4i)"/>
+          <line x1="470" y1="120" x2="620" y2="200" stroke="#b45309" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr4i)"/>
+
+          <!-- SystemClock (left) -->
+          <g>
+            <rect x="60" y="200" width="280" height="180" rx="10" fill="#ffffff" stroke="#b45309" stroke-width="1.5"/>
+            <text x="200" y="226" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#92400e">Class  ·  production</text>
+            <text x="200" y="248" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#78350f">SystemClock</text>
+            <line x1="80" y1="258" x2="320" y2="258" stroke="#fbbf24" stroke-width="1"/>
+            <text x="80" y="280" font-family="JetBrains Mono, monospace" font-size="11" fill="#0f172a">def now(self) -> datetime:</text>
+            <text x="100" y="298" font-family="JetBrains Mono, monospace" font-size="11" fill="#b45309">    return datetime.now(tz=UTC)</text>
+            <line x1="80" y1="312" x2="320" y2="312" stroke="#f1f5f9" stroke-width="1"/>
+            <text x="80" y="332" font-family="Inter, sans-serif" font-size="11" fill="#64748b">Reads the real wall clock. Used when</text>
+            <text x="80" y="348" font-family="Inter, sans-serif" font-size="11" fill="#64748b">the system is running for real. tz-aware</text>
+            <text x="80" y="364" font-family="Inter, sans-serif" font-size="11" fill="#64748b">via <tspan font-family="JetBrains Mono, monospace" fill="#0f172a">datetime.UTC</tspan> (Py 3.11+).</text>
+          </g>
+
+          <!-- FrozenClock (right) -->
+          <g>
+            <rect x="480" y="200" width="280" height="180" rx="10" fill="#ffffff" stroke="#b45309" stroke-width="1.5"/>
+            <text x="620" y="226" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#92400e">Class  ·  tests</text>
+            <text x="620" y="248" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#78350f">FrozenClock</text>
+            <line x1="500" y1="258" x2="740" y2="258" stroke="#fbbf24" stroke-width="1"/>
+            <text x="500" y="280" font-family="JetBrains Mono, monospace" font-size="11" fill="#0f172a">def __init__(self, at: datetime):</text>
+            <text x="520" y="298" font-family="JetBrains Mono, monospace" font-size="11" fill="#0f172a">    self._at = at</text>
+            <text x="500" y="320" font-family="JetBrains Mono, monospace" font-size="11" fill="#0f172a">def now(self) -> datetime:</text>
+            <text x="520" y="338" font-family="JetBrains Mono, monospace" font-size="11" fill="#b45309">    return self._at</text>
+            <line x1="500" y1="352" x2="740" y2="352" stroke="#f1f5f9" stroke-width="1"/>
+            <text x="500" y="372" font-family="Inter, sans-serif" font-size="11" fill="#64748b">Set the time once at construction.</text>
+          </g>
+
+          <!-- Where it's used (right annotation) -->
+          <g transform="translate(60, 410)">
+            <text x="0" y="0" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#0f172a">Where it flows</text>
+            <g font-family="JetBrains Mono, monospace" font-size="10.5" fill="#475569">
+              <text x="0" y="18">append_event(... clock: Clock)         →  ts = clock.now().isoformat()</text>
+            </g>
+          </g>
+        </svg>
+        <p class="figure-caption">Figure 4.1 — The Clock protocol and its two implementations. Dashed arrows indicate protocol satisfaction (structural subtyping, not inheritance).</p>
+      </div>
+
+      <div class="callout callout-warn">
+        <p><strong>Discipline:</strong> no module other than <code>src/dsky/clock.py</code> may call <code>datetime.now()</code>, <code>datetime.utcnow()</code>, <code>time.time()</code>, or any equivalent. The whole-repo AST scan in <code>test_clock_discipline.py</code> enforces this; the test goes red the moment anyone slips a secret watch past the gate.</p>
+      </div>
+    </section>
+
+    <!-- ============================================ 5. DISCIPLINE SCANS ============================================ -->
+    <section id="discipline">
+      <div class="section-header">
+        <span class="section-num">05</span>
+        <h2 class="section-title">Discipline scans</h2>
+      </div>
+      <p class="section-lede">Two AST-based scans live in the test suite and run on every commit. They turn architectural rules into mechanical checks — substring grep wouldn't catch <code>from datetime import datetime as dt; dt.now()</code>, so we parse the source tree and walk the AST.</p>
+
+      <div class="scan-grid">
+
+        <div class="scan-card">
+          <div class="head">
+            <span class="id">test_clock_discipline.py</span>
+            <span class="title">Clock discipline scan</span>
+          </div>
+          <p>Whole-repo scan. Catches <em>any</em> call to <code>datetime.now()</code> / <code>datetime.utcnow()</code> outside <code>clock.py</code>, including aliased imports.</p>
+          <ul>
+            <li>ALLOWED_FILES = <code>{src/dsky/clock.py}</code></li>
+            <li>Walks REPO_ROOT.rglob("*.py")</li>
+            <li>Excludes .venv, .git, caches</li>
+            <li>Parses each file with <code>ast.parse()</code></li>
+            <li>For each <code>ast.Call</code>, checks the receiver against the <code>datetime</code> module</li>
+            <li>3 tests, all pass</li>
+          </ul>
+        </div>
+
+        <div class="scan-card">
+          <div class="head">
+            <span class="id">test_events.py</span>
+            <span class="title">Write-discipline scan</span>
+          </div>
+          <p>Production-only scan (tests excluded by design — tamper tests must corrupt the DB directly to prove detection works).</p>
+          <ul>
+            <li>ALLOWED_WRITE_FILES = <code>{db/events.py, db/projections.py}</code></li>
+            <li>Scan root: <code>src/dsky/</code></li>
+            <li>Walks <code>src/dsky/**/*.py</code></li>
+            <li>For each <code>ast.Constant</code> string, looks for the keywords <code>INSERT </code>, <code>UPDATE </code>, <code>DELETE </code></li>
+            <li>11 tests, all pass</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="code-header">src/dsky/db/events.py · append_event signature</div>
+      <div class="code-block"><span class="c"># Single write path. Everything that touches the events table</span>
+<span class="c"># comes through here. clock is keyword-only so it can't be</span>
+<span class="c"># silently dropped at a call site.</span>
+<span class="k">def</span> <span class="f">append_event</span>(
+    <span class="v">conn</span>: sqlite3.Connection,
+    <span class="v">event_type</span>: str,
+    <span class="v">entity_id</span>: str,
+    <span class="v">actor</span>: str,
+    <span class="v">payload</span>: dict[<span class="v">str</span>, <span class="v">Any</span>],
+    <span class="v">*</span>,
+    <span class="v">clock</span>: Clock,             <span class="c"># the only legal source of "now"</span>
+) -&gt; <span class="v">int</span>:
+    <span class="v">ts</span> = <span class="v">clock</span>.now().isoformat()
+    <span class="v">payload_json</span> = <span class="f">_canonical</span>(<span class="v">payload</span>)
+    <span class="v">prev_hash</span> = <span class="f">_prev_hash</span>(<span class="v">conn</span>)            <span class="c"># or _GENESIS_SEED</span>
+    <span class="v">hash_</span> = <span class="f">_compute_hash</span>(<span class="v">prev_hash</span>, <span class="v">payload_json</span>, <span class="v">ts</span>)
+    <span class="v">cur</span> = <span class="v">conn</span>.<span class="f">execute</span>(
+        <span class="s">"INSERT INTO events (ts, event_type, entity_id, actor, payload, prev_hash, hash) "</span>
+        <span class="s">"VALUES (?, ?, ?, ?, ?, ?, ?)"</span>,
+        (<span class="v">ts</span>, <span class="v">event_type</span>, <span class="v">entity_id</span>, <span class="v">actor</span>, <span class="v">payload_json</span>, <span class="v">prev_hash</span>, <span class="v">hash_</span>),
+    )
+    <span class="v">conn</span>.<span class="f">commit</span>()
+    <span class="k">return</span> <span class="v">cur</span>.lastrowid</div>
+
+      <div class="callout callout-ok">
+        <p><strong>Verified by 11-case matrix:</strong> direct calls, aliased imports (<code>from datetime import datetime as dt</code>), fully-qualified calls (<code>datetime.datetime.now()</code>), <code>utcnow()</code>, module aliases, brand-new files, sanctioned files, self-references, and docstring mentions — every form is caught, every form is allowed where it should be.</p>
+      </div>
+    </section>
+
+    <!-- ============================================ 6. TIME RULES ============================================ -->
+    <section id="time">
+      <div class="section-header">
+        <span class="section-num">06</span>
+        <h2 class="section-title">Time rules</h2>
+      </div>
+      <p class="section-lede">Every event row carries two timestamps. The backtest gate is mechanical: a fact is <em>visible</em> at <code>decision_time</code> iff <code>available_time ≤ decision_time</code>. <code>event_time</code> is metadata; <code>available_time</code> is the gate.</p>
+
+      <div class="figure">
+        <svg viewBox="0 0 820 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Backtest time gate: facts are visible when available_time is at or before decision_time">
+          <defs>
+            <linearGradient id="visible" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%"  stop-color="#d1fae5"/>
+              <stop offset="100%" stop-color="#d1fae5" stop-opacity="0.1"/>
+            </linearGradient>
+            <linearGradient id="future" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%"  stop-color="#fee2e2" stop-opacity="0.1"/>
+              <stop offset="100%" stop-color="#fee2e2"/>
+            </linearGradient>
+            <marker id="arr6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#0f172a"/>
+            </marker>
+          </defs>
+
+          <!-- Background bands -->
+          <rect x="40"  y="180" width="500" height="20" fill="url(#visible)"/>
+          <rect x="540" y="180" width="240" height="20" fill="url(#future)"/>
+
+          <!-- Spine -->
+          <line x1="40" y1="200" x2="780" y2="200" stroke="#0f172a" stroke-width="2" marker-end="url(#arr6)"/>
+
+          <!-- Tick marks: 4 events + decision_time -->
+          <g font-family="JetBrains Mono, monospace" font-size="11" fill="#0f172a">
+
+            <!-- event A -->
+            <line x1="120" y1="192" x2="120" y2="208" stroke="#0f172a" stroke-width="1.5"/>
+            <circle cx="120" cy="200" r="5" fill="#047857"/>
+            <text x="120" y="178" text-anchor="middle" font-weight="600">event A</text>
+            <text x="120" y="232" text-anchor="middle" font-size="10" fill="#475569">event_time = t₀</text>
+            <text x="120" y="246" text-anchor="middle" font-size="10" fill="#475569">available  = t₀+0s</text>
+
+            <!-- event B -->
+            <line x1="280" y1="192" x2="280" y2="208" stroke="#0f172a" stroke-width="1.5"/>
+            <circle cx="280" cy="200" r="5" fill="#047857"/>
+            <text x="280" y="178" text-anchor="middle" font-weight="600">event B</text>
+            <text x="280" y="232" text-anchor="middle" font-size="10" fill="#475569">event_time = t₁</text>
+            <text x="280" y="246" text-anchor="middle" font-size="10" fill="#475569">available  = t₁+0s</text>
+
+            <!-- event C (future at decision time) -->
+            <line x1="500" y1="192" x2="500" y2="208" stroke="#0f172a" stroke-width="1.5"/>
+            <circle cx="500" cy="200" r="5" fill="#b91c1c"/>
+            <text x="500" y="178" text-anchor="middle" font-weight="600" fill="#b91c1c">event C</text>
+            <text x="500" y="232" text-anchor="middle" font-size="10" fill="#b91c1c">event_time = t₂</text>
+            <text x="500" y="246" text-anchor="middle" font-size="10" fill="#b91c1c">available  = t₂+5s</text>
+
+            <!-- decision_time marker -->
+            <line x1="540" y1="170" x2="540" y2="230" stroke="#0f172a" stroke-width="2.5" stroke-dasharray="3 3"/>
+            <text x="540" y="158" text-anchor="middle" font-weight="700" fill="#0f172a">decision_time</text>
+            <text x="540" y="278" text-anchor="middle" font-size="10" fill="#475569">we are pretending it is t₃</text>
+
+            <!-- event D (clearly future) -->
+            <line x1="700" y1="192" x2="700" y2="208" stroke="#0f172a" stroke-width="1.5"/>
+            <circle cx="700" cy="200" r="5" fill="#b91c1c"/>
+            <text x="700" y="178" text-anchor="middle" font-weight="600" fill="#b91c1c">event D</text>
+            <text x="700" y="232" text-anchor="middle" font-size="10" fill="#b91c1c">event_time = t₄</text>
+            <text x="700" y="246" text-anchor="middle" font-size="10" fill="#b91c1c">available  = t₄+0s</text>
+          </g>
+
+          <!-- Past / future labels -->
+          <text x="60" y="320" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#475569" letter-spacing="0.05em">PAST · VISIBLE</text>
+          <text x="540" y="320" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#b91c1c" letter-spacing="0.05em">FUTURE · NOT YET VISIBLE</text>
+
+          <!-- The gate rule -->
+          <g transform="translate(40, 360)">
+            <rect x="0" y="0" width="740" height="90" rx="8" fill="#ede9fe" stroke="#6d28d9" stroke-width="1.5"/>
+            <text x="20" y="26" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#4c1d95">The gate</text>
+            <text x="20" y="50" font-family="JetBrains Mono, monospace" font-size="12.5" fill="#0f172a">fact.visible  =  fact.available_time  &lt;=  decision_time</text>
+            <text x="20" y="72" font-family="Inter, sans-serif" font-size="11.5" fill="#4c1d95">A fact that happened in the world before decision_time is invisible if its delivery arrived after decision_time.</text>
+          </g>
+        </svg>
+        <p class="figure-caption">Figure 6.1 — Backtest visibility window. Green dots are readable at decision_time; red dots arrived (or will arrive) too late.</p>
+      </div>
+
+      <div class="callout callout-info">
+        <p><strong>Why two timestamps, not one?</strong> in real markets a price print at 14:00:00 is not the same fact as "we received the 14:00:00 price at 14:00:00.873". The first is an <em>event_time</em>, the second is an <em>available_time</em>. A backtest that pretends to be at 14:00:00 must not see the print until 14:00:00.873 — otherwise it has a perfect view of a clock that doesn't exist in production.</p>
+      </div>
+    </section>
+
+    <!-- ============================================ 7. SCHEMA ============================================ -->
+    <section id="schema">
+      <div class="section-header">
+        <span class="section-num">07</span>
+        <h2 class="section-title">Schema</h2>
+      </div>
+      <p class="section-lede">Six tables, all created by <code>src/dsky/db/schema.sql</code>. The events table is the spine; the three projection tables are derived state rebuilt by replay; the two placeholders are intentionally empty until their feature lands.</p>
+
+      <div class="schema-grid">
+
+        <div class="schema-table">
+          <div class="t-head"><span class="dot"></span><span class="name">events</span><span style="margin-left:auto; font-size:11px; color:#b91c1c; font-weight:700;">SPINE</span></div>
+          <table>
+            <tr><td><span class="pk">PK</span><span class="col-name">id</span></td><td class="col-type">INTEGER · autoincrement</td></tr>
+            <tr><td><span class="col-name">ts</span></td><td class="col-type">TEXT · ISO-8601 UTC</td></tr>
+            <tr><td><span class="col-name">event_type</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">entity_id</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">actor</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">payload</span></td><td class="col-type">TEXT · canonical JSON</td></tr>
+            <tr><td><span class="col-name">prev_hash</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">hash</span></td><td class="col-type">TEXT · UNIQUE</td></tr>
+          </table>
+          <div class="idx">IDX  (entity_id, id)   IDX  (event_type, id)</div>
+        </div>
+
+        <div class="schema-table proj">
+          <div class="t-head"><span class="dot"></span><span class="name">current_ideas</span><span style="margin-left:auto; font-size:11px; color:#047857; font-weight:700;">PROJECTION</span></div>
+          <table>
+            <tr><td><span class="pk">PK</span><span class="col-name">entity_id</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">current_state</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">last_event_id</span></td><td class="col-type">INTEGER</td></tr>
+            <tr><td><span class="col-name">updated_ts</span></td><td class="col-type">TEXT</td></tr>
+          </table>
+          <div class="idx">last idea.* event per entity</div>
+        </div>
+
+        <div class="schema-table proj">
+          <div class="t-head"><span class="dot"></span><span class="name">rejection_ledger</span><span style="margin-left:auto; font-size:11px; color:#047857; font-weight:700;">PROJECTION</span></div>
+          <table>
+            <tr><td><span class="col-name">fingerprint</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">asset</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">reason</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">rejected_ts</span></td><td class="col-type">TEXT</td></tr>
+          </table>
+          <div class="idx">IDX  (fingerprint)   one row per idea.rejected event</div>
+        </div>
+
+        <div class="schema-table proj">
+          <div class="t-head"><span class="dot"></span><span class="name">playbooks</span><span style="margin-left:auto; font-size:11px; color:#047857; font-weight:700;">PROJECTION</span></div>
+          <table>
+            <tr><td><span class="pk">PK</span><span class="col-name">entity_id</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">approval_type</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">monitoring_status</span></td><td class="col-type">TEXT</td></tr>
+            <tr><td><span class="col-name">last_event_id</span></td><td class="col-type">INTEGER</td></tr>
+          </table>
+          <div class="idx">latest approval + monitoring per playbook</div>
+        </div>
+
+        <div class="schema-table placeholder">
+          <div class="t-head"><span class="dot"></span><span class="name">paper_positions</span><span style="margin-left:auto; font-size:11px; color:#64748b; font-weight:700;">PLACEHOLDER</span></div>
+          <table>
+            <tr><td><span class="pk">PK</span><span class="col-name">id</span></td><td class="col-type">INTEGER</td></tr>
+          </table>
+          <div class="idx">populated by a later step (research/backtest paper fills)</div>
+        </div>
+
+        <div class="schema-table placeholder">
+          <div class="t-head"><span class="dot"></span><span class="name">attribution_history</span><span style="margin-left:auto; font-size:11px; color:#64748b; font-weight:700;">PLACEHOLDER</span></div>
+          <table>
+            <tr><td><span class="pk">PK</span><span class="col-name">id</span></td><td class="col-type">INTEGER</td></tr>
+          </table>
+          <div class="idx">populated by a later step (research/attribution rolls)</div>
+        </div>
+
+      </div>
+
+      <div class="callout callout-info">
+        <p><strong>Write authority per table:</strong></p>
+        <ul style="margin: 4px 0 0; padding-left: 20px;">
+          <li><code>events</code> — <code>db/events.py:append_event()</code> only (test code exempt, by design)</li>
+          <li><code>current_ideas</code>, <code>rejection_ledger</code>, <code>playbooks</code> — <code>db/projections.py:rebuild_projections()</code> only</li>
+          <li><code>paper_positions</code>, <code>attribution_history</code> — nothing yet</li>
+        </ul>
+        <p style="margin-top:8px;">The write-discipline scan enforces this on <code>src/dsky/</code> at every commit. A file that gains a raw <code>INSERT</code> outside the allow-list fails the suite.</p>
+      </div>
+    </section>
+
+    <!-- ============================================ 8. TEST SUITE ============================================ -->
+    <section id="tests">
+      <div class="section-header">
+        <span class="section-num">08</span>
+        <h2 class="section-title">Test suite</h2>
+      </div>
+      <p class="section-lede">29 tests across 4 files. Tests are the spec: each one encodes an invariant the system must keep, and any test that fails is treated as a fact about the world, not a feeling.</p>
+
+      <div class="test-summary">
+        <div class="stat"><div class="num">29</div><div class="lbl">tests</div></div>
+        <div class="stat"><div class="num">4</div><div class="lbl">files</div></div>
+        <div class="stat"><div class="num">0.08s</div><div class="lbl">wall time</div></div>
+        <div class="stat"><div class="num">0</div><div class="lbl">runtime deps</div></div>
+        <div class="stat"><div class="num">36</div><div class="lbl">mypy files</div></div>
+        <div class="stat"><div class="num">0</div><div class="lbl">lint issues</div></div>
+      </div>
+
+      <div class="test-tree">
+        <div class="dir">tests/</div>
+        <ul>
+          <li><span class="file">__init__.py</span></li>
+          <li><span class="file">test_package.py</span><span class="count">· 1 test · smoke</span>
+            <ul>
+              <li>test_dsky_is_importable</li>
+            </ul>
+          </li>
+          <li><span class="file">test_clock_discipline.py</span><span class="count">· 3 tests · whole-repo AST scan</span>
+            <ul>
+              <li>test_no_datetime_now_in_repo</li>
+              <li>test_frozen_clock_returns_fixed_time</li>
+              <li>test_system_clock_returns_tz_aware_utc</li>
+            </ul>
+          </li>
+          <li><span class="file">test_events.py</span><span class="count">· 11 tests · chain integrity, discipline</span>
+            <ul>
+              <li>test_three_events_form_valid_chain</li>
+              <li>test_verify_chain_returns_none_on_intact_log</li>
+              <li>test_verify_chain_empty_db_returns_none</li>
+              <li>test_tamper_payload_flags_correct_row</li>
+              <li>test_tamper_first_row_flags_id_1</li>
+              <li>test_tamper_prev_hash_flags_correct_row</li>
+              <li>test_tamper_last_row_flags_correctly</li>
+              <li>test_canonical_json_is_deterministic</li>
+              <li>test_canonical_json_nested_sort</li>
+              <li>test_append_event_uses_clock_not_datetime_now</li>
+              <li>test_only_events_py_issues_db_writes</li>
+            </ul>
+          </li>
+          <li><span class="file">test_projections.py</span><span class="count">· 14 tests · projection semantics, log wins</span>
+            <ul>
+              <li>test_rebuild_is_idempotent_and_deterministic</li>
+              <li>test_rebuild_remains_idempotent_across_many_calls</li>
+              <li>test_rebuild_with_unknown_event_types_is_idempotent</li>
+              <li>test_projections_start_empty_until_rebuild</li>
+              <li>test_current_ideas_reflects_latest_state_per_entity</li>
+              <li>test_current_ideas_handles_a_long_chain_of_state_changes</li>
+              <li>test_rejection_ledger_one_row_per_rejection</li>
+              <li>test_rejection_ledger_records_every_rejection</li>
+              <li>test_playbooks_reflects_latest_approval_and_monitoring</li>
+              <li>test_placeholder_tables_remain_empty_after_rebuild</li>
+              <li>test_rebuild_is_atomic_on_failure</li>
+              <li>test_log_overrides_a_corrupted_projection</li>
+              <li>test_log_wins_even_after_a_partial_rebuild_then_more_events</li>
+              <li>test_db_projections_is_in_the_allowed_write_set</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+
+      <div class="callout callout-warn">
+        <p><strong>The rule, restated for the record:</strong> when a test is asked for first, the test is written <em>before</em> the implementation, and it <em>fails</em> before the implementation exists. A test is never weakened to make a failing implementation pass. The first response to a green test that shouldn't have been green is to ask, not to celebrate.</p>
+      </div>
+    </section>
+
+    <footer>
+      <div>Direction-Sky · pre-registered, append-only quant research</div>
+      <div class="mono">docs/architecture.html · synced with HEAD <code>13156fc</code></div>
+    </footer>
+
+  </main>
+</div>
+
+</body>
+</html>
