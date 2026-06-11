@@ -54,3 +54,6 @@ htmlcov/
 
 # Data
 *.parquet
+
+# Local dev tools (regenerated on demand, never source)
+graphify-out/
