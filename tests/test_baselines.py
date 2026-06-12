@@ -8,7 +8,6 @@
   (b) the trade count and average holding period match the request
   -- the "apples-to-apples" claim.
 """
-import random
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -22,8 +21,7 @@ from dsky.db.engine import open_db
 from dsky.db.projections import rebuild_projections
 from dsky.research.backtest.baselines import buy_and_hold, random_entry_null
 from dsky.research.backtest.costs import CostModel
-from dsky.research.backtest.engine import BacktestSpec
-
+from dsky.research.backtest.engine import BacktestSpec, Side
 
 _T0 = datetime(2026, 1, 22, 12, 0, 0, tzinfo=UTC)
 
@@ -102,14 +100,15 @@ class TestBuyAndHold:
         )
 
         # Analytical: buy at first bar's open (100), close at last bar's
-        # close (108). shares = 10_000/100 = 100. Two fills of cost.
-        # net_pnl = (108 - 100) * 100 - 2 * cost.
+        # close (108). shares = 10_000/100 = 100. Each fill's cost
+        # uses its own fill price (exit is at 108, not 100).
         buy_price = 100.0
         sell_price = 108.0
         shares = 10_000.0 / buy_price
-        cost_per_fill = costs.apply(buy_price, shares)
+        buy_cost = costs.apply(buy_price, shares)
+        sell_cost = costs.apply(sell_price, shares)
         expected_return = (
-            (sell_price - buy_price) * shares - 2 * cost_per_fill
+            (sell_price - buy_price) * shares - buy_cost - sell_cost
         ) / 10_000.0
 
         assert result.total_return == pytest.approx(expected_return, abs=1e-6)
@@ -235,24 +234,27 @@ class TestRandomEntryNull:
                 datetime(2026, 2, 10, tzinfo=UTC),
             ),
         )
-        # Use a fixed seed for reproducibility.
-        rng = random.Random(7)
+        # Use a fixed seed for reproducibility (matches the seed
+        # passed to random_entry_null below).
         request_hold = timedelta(days=2)
         result = random_entry_null(
             mem_db, spec=spec, clock=clock,
             trade_count=10, avg_holding_period=request_hold, seed=7,
         )
         # Compute holding periods from the trade pairs (entry/exit).
-        rounds: list[tuple[datetime, datetime]] = []
-        for i in range(0, len(result.trades), 2):
-            rounds.append((result.trades[i].decision_time, result.trades[i + 1].decision_time))
+        rounds: list[tuple[datetime, datetime]] = [
+            (result.trades[i].decision_time, result.trades[i + 1].decision_time)
+            for i in range(0, len(result.trades), 2)
+        ]
         actual_avg_seconds = sum(
             (ex - en).total_seconds() for en, ex in rounds
         ) / max(1, len(rounds))
-        actual_avg = timedelta(seconds=actual_avg_seconds)
-        # Generous tolerance: ±50% of the request, since the
-        # sample mean of 10 exponentials is noisy.
-        assert abs(actual_avg_seconds - request_hold.total_seconds()) < 0.5 * request_hold.total_seconds()
+        # Generous tolerance: plus/minus 50% of the request, since
+        # the sample mean of 10 exponentials is noisy.
+        assert (
+            abs(actual_avg_seconds - request_hold.total_seconds())
+            < 0.5 * request_hold.total_seconds()
+        )
 
     def test_random_null_uses_position_size_consistently(
         self, mem_db, tmp_path, clock,
@@ -267,7 +269,6 @@ class TestRandomEntryNull:
             trade_count=2, avg_holding_period=timedelta(days=2), seed=42,
             position_size=10_000.0,
         )
-        from dsky.research.backtest.engine import Side
         entry_trades = [t for t in result.trades if t.side == Side.LONG]
         for trade in entry_trades:
             # Entry trade: shares * fill_price should equal position_size.

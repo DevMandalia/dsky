@@ -51,7 +51,6 @@ def _bars_in_window(
     return all_bars.filter(
         (pl.col("event_time") >= start) & (pl.col("event_time") <= end),
     ).sort("event_time")
-    ).sort("event_time")
 
 
 def _write_run_event(  # noqa: PLR0913 -- internal helper, kw-only-args
