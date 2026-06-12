@@ -1,11 +1,9 @@
 """The look-ahead invariant: the engine must never observe a bar
 whose ``available_time`` exceeds the engine's current ``decision_time``.
 
-This test expresses the invariant BEFORE the engine exists. It is
-the spec the engine is built to satisfy. The body is xfail until
-``dsky.research.backtest.engine.BacktestEngine`` is implemented; the
-moment that class lands and respects the gate, the body executes and
-passes.
+This test exercises the engine's data-access contract: at every
+decision point the engine may only see bars via
+``load_bars(symbol, decision_time)``.
 
 The invariant lives in two layers:
 
@@ -25,13 +23,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 import polars as pl
-import pytest
 
 from dsky.clock import FrozenClock
 from dsky.data.bars import write_bars
 from dsky.db.engine import open_db
 from dsky.db.projections import rebuild_projections
-from dsky.research.backtest.engine import LookAheadViolation
+from dsky.research.backtest.engine import BacktestEngine, BacktestSpec, LookAheadViolation
 
 # A frozen "now" well after the 2026-01-13 14:30 UTC open (the first
 # decision time below) so the clock is sane and the manifest event
@@ -102,19 +99,8 @@ class TestEngineLookAheadInvariant:
     ``available_time > decision_time`` is observed, the engine
     raises :class:`LookAheadViolation`.
 
-    This class is marked ``xfail`` until
-    ``dsky.research.backtest.engine.BacktestEngine`` is implemented.
-    The body below is the spec the engine will be built to satisfy.
     """
 
-    @pytest.mark.xfail(
-        reason=(
-            "backtest engine not implemented yet; this test is the spec "
-            "the engine is being built to satisfy. Will pass when "
-            "BacktestEngine respects the available_time <= decision_time gate."
-        ),
-        strict=False,
-    )
     def test_engine_never_requests_a_bar_with_future_available_time(
         self, tmp_path: object,
     ) -> None:
@@ -131,11 +117,12 @@ class TestEngineLookAheadInvariant:
         completion with no exception. If the engine ever asks for
         future data, the test catches the violation.
         """
-        # The test runs the engine -- which doesn't exist yet, so this
-        # line fails today with ImportError / AttributeError. The
-        # xfail decorator catches that failure.
-        from dsky.research.backtest.engine import BacktestEngine  # noqa: PLC0415
-
+        # The test runs the engine. The engine enforces the
+        # available_time <= decision_time gate both via the data
+        # layer (load_bars) and its own defensive backstop
+        # (_check_no_look_ahead). A correct engine runs to
+        # completion with no exception. If the engine ever asks
+        # for future data, LookAheadViolation is raised.
         # Synthetic data: 3 daily bars with available_time = next market open.
         conn = open_db(":memory:")
         _setup_synthetic_data(conn, tmp_path / "SPY.parquet")  # type: ignore[operator]
@@ -155,9 +142,14 @@ class TestEngineLookAheadInvariant:
             datetime(2026, 1, 15, 14, 30, 0, tzinfo=UTC),
         ]
 
+        spec = BacktestSpec(
+            symbol="SPY",
+            training_window=(decision_times[0], decision_times[-1]),
+        )
+
         result = engine.run(
             strategy=_trivial_strategy,
-            symbol="SPY",
+            spec=spec,
             decision_times=decision_times,
         )
 
