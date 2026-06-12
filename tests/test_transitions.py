@@ -39,7 +39,14 @@ from dsky.db.engine import open_db
 from dsky.db.events import append_event, verify_chain
 from dsky.db.projections import rebuild_projections
 from dsky.lifecycle.machine import IllegalTransition, UnknownEntity, transition
+from dsky.lifecycle.registry import pre_register
 from dsky.lifecycle.states import ApprovalType, State
+from dsky.research.spec import (
+    ComputableRule,
+    HypothesisSpec,
+    SuccessCriteria,
+    TimeWindow,
+)
 
 _T0 = datetime(2026, 6, 10, 12, 0, 0, tzinfo=UTC)
 
@@ -65,6 +72,30 @@ def clock() -> FrozenClock:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _minimal_spec() -> HypothesisSpec:
+    """A complete spec for seeding ``spec.pre_registered`` events in tests."""
+    return HypothesisSpec(
+        asset="TEST",
+        signal_definition=ComputableRule(kind="test_signal", parameters=()),
+        entry_rule=ComputableRule(kind="test_entry", parameters=()),
+        exit_rule=ComputableRule(kind="test_exit", parameters=()),
+        prediction="test prediction",
+        success_criteria=SuccessCriteria(
+            metric="total_return", threshold=0.0, comparator="gt",
+        ),
+        train_window=TimeWindow(start="2020-01-01", end="2023-12-31"),
+        holdout_window=TimeWindow(start="2024-01-01", end="2024-12-31"),
+        required_null_models=("buy_and_hold",),
+    )
+
+
+def _seed_pre_registered(
+    conn: sqlite3.Connection, entity_id: str, clock: FrozenClock,
+) -> None:
+    """Append a ``spec.pre_registered`` event (required before BACKTESTED)."""
+    pre_register(conn, entity_id, _minimal_spec(), "seeder", clock)
+
 
 def _register(conn: sqlite3.Connection, entity_id: str, clock: FrozenClock) -> int:
     """Append an ``idea.registered`` event. Implies state CAPTURED."""
@@ -218,6 +249,8 @@ def test_every_legal_transition_is_allowed(
     kwargs: dict[str, Any] = {}
     if to_state is State.APPROVED:
         kwargs["approval_type"] = ApprovalType.WATCHLIST
+    if to_state is State.BACKTESTED:
+        _seed_pre_registered(mem_db, "idea-1", clock)
     new_id = transition(mem_db, "idea-1", to_state, "actor", clock, **kwargs)
     assert new_id > 0
     # The latest state-change event for this entity must record to_state.
@@ -440,6 +473,8 @@ def test_transition_changelog_is_complete(
         kwargs: dict[str, Any] = {}
         if next_state is State.APPROVED:
             kwargs["approval_type"] = ApprovalType.WATCHLIST
+        if next_state is State.BACKTESTED:
+            _seed_pre_registered(mem_db, "idea-1", clock)
         transition(mem_db, "idea-1", next_state, "alice", clock, **kwargs)
 
     rows = mem_db.execute(

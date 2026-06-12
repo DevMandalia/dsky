@@ -17,7 +17,9 @@ from typing import Any
 
 from dsky.clock import Clock
 from dsky.db.events import append_event
+from dsky.lifecycle.registry import has_pre_registered, load_pre_registered_spec
 from dsky.lifecycle.states import ApprovalType, State
+from dsky.research.spec import SuccessCriteria
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -45,6 +47,23 @@ class IllegalTransition(ValueError):  # noqa: N818
             f"illegal transition for {entity_id!r}: "
             f"{from_state.value if from_state is not None else None!r} -> "
             f"{to_state.value!r}",
+        )
+
+
+class PreRegistrationRequired(LookupError):  # noqa: N818
+    """Raised when backtest or success-criteria access precedes pre-registration.
+
+    AGENTS.md: a spec must be frozen and hashed before any backtest reads
+    data. This is enforced mechanically here, not by convention.
+    """
+
+    def __init__(self, entity_id: str, *, operation: str) -> None:
+        """Record the entity and the blocked operation."""
+        self.entity_id = entity_id
+        self.operation = operation
+        super().__init__(
+            f"{operation} for {entity_id!r} requires a prior "
+            f"spec.pre_registered event",
         )
 
 
@@ -141,6 +160,40 @@ def _current_state_from_log(
 
 
 # ---------------------------------------------------------------------------
+# Pre-registration gates (mechanical, not conventional)
+# ---------------------------------------------------------------------------
+
+def read_success_criteria(
+    conn: sqlite3.Connection, entity_id: str,
+) -> SuccessCriteria:
+    """Return the pre-registered success criteria for ``entity_id``.
+
+    Raises
+    ------
+    PreRegistrationRequired
+        If no ``spec.pre_registered`` event exists for the entity.
+
+    """
+    if not has_pre_registered(conn, entity_id):
+        raise PreRegistrationRequired(entity_id, operation="read_success_criteria")
+    spec = load_pre_registered_spec(conn, entity_id)
+    return spec.success_criteria
+
+
+def assert_backtest_allowed(conn: sqlite3.Connection, entity_id: str) -> None:
+    """Refuse a backtest unless the entity has been pre-registered.
+
+    Raises
+    ------
+    PreRegistrationRequired
+        If no ``spec.pre_registered`` event exists for the entity.
+
+    """
+    if not has_pre_registered(conn, entity_id):
+        raise PreRegistrationRequired(entity_id, operation="backtest")
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -195,6 +248,12 @@ def transition(  # noqa: PLR0913
     if to_state not in TRANSITIONS[current]:
         raise IllegalTransition(entity_id, current, to_state)
 
+    # Mechanical pre-registration gate: entering BACKTESTED requires a
+    # frozen spec in the log, not merely the PRE_REGISTERED lifecycle
+    # state (which could be seeded without an event).
+    if to_state is State.BACKTESTED:
+        assert_backtest_allowed(conn, entity_id)
+
     payload: dict[str, Any] = {"from": current.value, "to": to_state.value}
 
     if to_state is State.APPROVED:
@@ -220,7 +279,10 @@ __all__ = [
     "TRANSITIONS",
     "ApprovalType",
     "IllegalTransition",
+    "PreRegistrationRequired",
     "State",
     "UnknownEntity",
+    "assert_backtest_allowed",
+    "read_success_criteria",
     "transition",
 ]
